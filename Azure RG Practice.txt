@@ -1,0 +1,144 @@
+azureuser@Azure:~$ az vm create \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --name my-vm \
+>   --image UbuntuLTS \
+>   --admin-username azureuser \
+>   --generate-ssh-keys
+SSH key files '/home/azureuser/.ssh/id_rsa' and '/home/azureuser/.ssh/id_rsa.pub' have been generated under ~/.ssh to allow SSH access to the VM. If using machines without permanent storage, back up your keys to a safe location.
+It is recommended to use parameter "--public-ip-sku Standard" to create new VM with Standard public IP. Please note that the default public IP used for VM creation will be changed from Basic to Standard in the future.
+{
+  "fqdns": "",
+  "id": "/subscriptions/1d710c43-434d-4b0c-8055-6a6a97426e8a/resourceGroups/learn-b00a3515-83a1-45e7-b2e1-adfdb6067166/providers/Microsoft.Compute/virtualMachines/my-vm",
+  "location": "westus",
+  "macAddress": "00-22-48-04-D3-96",
+  "powerState": "VM running",
+  "privateIpAddress": "10.0.0.4",
+  "publicIpAddress": "23.100.45.140",
+  "resourceGroup": "learn-b00a3515-83a1-45e7-b2e1-adfdb6067166",
+  "zones": ""
+}
+azureuser@Azure:~$ az vm extension set \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --vm-name my-vm \
+>   --name customScript \
+>   --publisher Microsoft.Azure.Extensions \
+>   --version 2.1 \
+>   --settings '{"fileUris":["https://raw.githubusercontent.com/MicrosoftDocs/mslearn-welcome-to-azure/master/configure-nginx.sh"]}' \
+>   --protected-settings '{"commandToExecute": "./configure-nginx.sh"}'
+{
+  "autoUpgradeMinorVersion": true,
+  "enableAutomaticUpgrade": null,
+  "forceUpdateTag": null,
+  "id": "/subscriptions/1d710c43-434d-4b0c-8055-6a6a97426e8a/resourceGroups/learn-b00a3515-83a1-45e7-b2e1-adfdb6067166/providers/Microsoft.Compute/virtualMachines/my-vm/extensions/customScript",
+  "instanceView": null,
+  "location": "westus",
+  "name": "customScript",
+  "protectedSettings": null,
+  "provisioningState": "Succeeded",
+  "publisher": "Microsoft.Azure.Extensions",
+  "resourceGroup": "learn-b00a3515-83a1-45e7-b2e1-adfdb6067166",
+  "settings": {
+    "fileUris": [
+      "https://raw.githubusercontent.com/MicrosoftDocs/mslearn-welcome-to-azure/master/configure-nginx.sh"
+    ]
+  },
+  "tags": null,
+  "type": "Microsoft.Compute/virtualMachines/extensions",
+  "typeHandlerVersion": "2.1",
+  "typePropertiesType": "customScript"
+}
+azureuser@Azure:~$ IPADDRESS="$(az vm list-ip-addresses \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --name my-vm \
+>   --query "[].virtualMachine.network.publicIpAddresses[*].ipAddress" \
+>   --output tsv)"
+azureuser@Azure:~$ curl --connect-timeout 5 http://$IPADDRESS
+curl: (28) Connection timed out after 5001 milliseconds
+azureuser@Azure:~$ curl: (28) Connection timed out after 5001 milliseconds
+bash: syntax error near unexpected token `28'
+azureuser@Azure:~$ echo $IPADDRESS
+23.100.45.140
+azureuser@Azure:~$ az network nsg list \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --query '[].name' \
+>   --output tsv
+my-vmNSG
+azureuser@Azure:~$ az network nsg rule list \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --nsg-name my-vmNSG
+[
+  {
+    "access": "Allow",
+    "description": null,
+    "destinationAddressPrefix": "*",
+    "destinationAddressPrefixes": [],
+    "destinationApplicationSecurityGroups": null,
+    "destinationPortRange": "22",
+    "destinationPortRanges": [],
+    "direction": "Inbound",
+    "etag": "W/\"208f06e1-62fb-4810-b597-7876e9c214e8\"",
+    "id": "/subscriptions/1d710c43-434d-4b0c-8055-6a6a97426e8a/resourceGroups/learn-b00a3515-83a1-45e7-b2e1-adfdb6067166/providers/Microsoft.Network/networkSecurityGroups/my-vmNSG/securityRules/default-allow-ssh",
+    "name": "default-allow-ssh",
+    "priority": 1000,
+    "protocol": "Tcp",
+    "provisioningState": "Succeeded",
+    "resourceGroup": "learn-b00a3515-83a1-45e7-b2e1-adfdb6067166",
+    "sourceAddressPrefix": "*",
+    "sourceAddressPrefixes": [],
+    "sourceApplicationSecurityGroups": null,
+    "sourcePortRange": "*",
+    "sourcePortRanges": [],
+    "type": "Microsoft.Network/networkSecurityGroups/securityRules"
+  }
+]
+azureuser@Azure:~$ az network nsg rule list \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --nsg-name my-vmNSG \
+>   --query '[].{Name:name, Priority:priority, Port:destinationPortRange, Access:access}' \
+>   --output table
+Name               Priority    Port    Access
+-----------------  ----------  ------  --------
+default-allow-ssh  1000        22      Allow
+azureuser@Azure:~$ az network nsg rule create \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --nsg-name my-vmNSG \
+>   --name allow-http \
+>   --protocol tcp \
+>   --priority 100 \
+>   --destination-port-ranges 80 \
+>   --access Allow
+{
+  "access": "Allow",
+  "description": null,
+  "destinationAddressPrefix": "*",
+  "destinationAddressPrefixes": [],
+  "destinationApplicationSecurityGroups": null,
+  "destinationPortRange": "80",
+  "destinationPortRanges": [],
+  "direction": "Inbound",
+  "etag": "W/\"a5d5cd04-6681-4745-a92f-6d89c23f751a\"",
+  "id": "/subscriptions/1d710c43-434d-4b0c-8055-6a6a97426e8a/resourceGroups/learn-b00a3515-83a1-45e7-b2e1-adfdb6067166/providers/Microsoft.Network/networkSecurityGroups/my-vmNSG/securityRules/allow-http",
+  "name": "allow-http",
+  "priority": 100,
+  "protocol": "Tcp",
+  "provisioningState": "Succeeded",
+  "resourceGroup": "learn-b00a3515-83a1-45e7-b2e1-adfdb6067166",
+  "sourceAddressPrefix": "*",
+  "sourceAddressPrefixes": [],
+  "sourceApplicationSecurityGroups": null,
+  "sourcePortRange": "*",
+  "sourcePortRanges": [],
+  "type": "Microsoft.Network/networkSecurityGroups/securityRules"
+}
+azureuser@Azure:~$ az network nsg rule list \
+>   --resource-group learn-b00a3515-83a1-45e7-b2e1-adfdb6067166 \
+>   --nsg-name my-vmNSG \
+>   --query '[].{Name:name, Priority:priority, Port:destinationPortRange, Access:access}' \
+>   --output table
+Name               Priority    Port    Access
+-----------------  ----------  ------  --------
+default-allow-ssh  1000        22      Allow
+allow-http         100         80      Allow
+azureuser@Azure:~$ curl --connect-timeout 5 http://$IPADDRESS
+<html><body><h2>Welcome to Azure! My name is my-vm.</h2></body></html>
+azureuser@Azure:~$
